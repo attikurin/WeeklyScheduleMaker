@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カスタム時間割メーカー</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+JP:wght@400;700&family=Yusei+Magic&family=RocknRoll+One&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* 印刷設定 */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 0;
+            }
+            body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                background-color: white !important;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-area {
+                width: 100% !important;
+                height: 100% !important;
+                padding: 10mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                transform: none !important;
+            }
+            /* 印刷時に背景画像や色を強制適用 */
+            * {
+                box-sizing: border-box;
+            }
+        }
+
+        /* 共通スタイル */
+        body {
+            background-color: #f3f4f6;
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+
+        .timetable-wrapper {
+            transition: all 0.3s ease;
+        }
+
+        /* --- テーマ定義 --- */
+
+        /* 1. ポップ (Pop) - 低学年向け、元気、かわいい */
+        .theme-pop {
+            font-family: 'Kosugi Maru', sans-serif;
+            --bg-color: #fff0f5;
+            --header-bg: #ffb7b2;
+            --header-text: #ffffff;
+            --border-style: dashed;
+            --border-width: 3px;
+            --border-color: #ff9aa2;
+            --cell-radius: 16px;
+            background-image: radial-gradient(#ff9aa2 20%, transparent 20%), radial-gradient(#ffdac1 20%, transparent 20%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            background-color: #fff5f5;
+        }
+        .theme-pop .t-header {
+            background-color: #ff9aa2;
+            color: white;
+            border-radius: 12px;
+            border: 3px dashed white;
+            box-shadow: 0 2px 4px rgba(255, 154, 162, 0.4);
+            text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
+        }
+        .theme-pop .t-cell {
+            border-radius: 16px;
+            border: 3px dashed #ffdac1;
+            background-color: white;
+            box-shadow: 3px 3px 0px #ffb7b2;
+        }
+
+        /* 2. ナチュラル (Natural) - 中学年〜向け、手書き風、カフェ風 */
+        .theme-natural {
+            font-family: 'Yusei Magic', sans-serif;
+            --bg-color: #fdfbf7;
+            background-color: #fdfbf7;
+            background-image: linear-gradient(#e5e5f7 1px, transparent 1px), linear-gradient(90deg, #e5e5f7 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .theme-natural .t-header {
+            background-color: #8d7b68; /* ブラウン */
+            color: #fdfbf7;
+            border-radius: 4px;
+            border: 2px solid #5c5042;
+            font-weight: normal;
+        }
+        .theme-natural .t-cell {
+            border-radius: 4px;
+            border: 2px solid #c8b6a6;
+            background-color: #fffefb;
+            box-shadow: 1px 1px 4px rgba(0,0,0,0.05);
+        }
+
+        /* 3. クール (Cool) - 高学年向け、スタイリッシュ、寒色系 */
+        .theme-cool {
+            font-family: 'Noto Sans JP', sans-serif;
+            --bg-color: #f0f9ff;
+            background-color: #f0f9ff;
+            background-image: repeating-linear-gradient(45deg, #e0f2fe 25%, transparent 25%, transparent 75%, #e0f2fe 75%, #e0f2fe), repeating-linear-gradient(45deg, #e0f2fe 25%, #f0f9ff 25%, #f0f9ff 75%, #e0f2fe 75%, #e0f2fe);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+        }
+        .theme-cool .t-header {
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            color: white;
+            border-radius: 2px;
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .theme-cool .t-cell {
+            border-radius: 2px;
+            border: 1px solid #bae6fd;
+            background-color: rgba(255,255,255,0.9);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* 4. シンプル (Simple) - 保護者・掲示用 */
+        .theme-simple {
+            font-family: 'Noto Sans JP', sans-serif;
+            --bg-color: #ffffff;
+            background-color: white;
+        }
+        .theme-simple .t-header {
+            background-color: #374151;
+            color: white;
+            border: 1px solid #1f2937;
+        }
+        .theme-simple .t-cell {
+            border: 1px solid #d1d5db;
+        }
+
+        /* 表示モード制御 */
+        .mode-child .detail-info {
+            display: none;
+        }
+        .mode-child .subject-name {
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+
+        .mode-parent .detail-info {
+            display: block;
+            font-size: 0.75rem;
+            color: #555;
+            margin-top: 2px;
+        }
+        .mode-parent .subject-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        /* グリッドレイアウト */
+        .timetable-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(5, 1fr); /* 時間軸 + 月〜金 */
+            gap: 8px;
+            height: 100%;
+        }
+
+        /* モーダル */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-active {
+            overflow-x: hidden;
+            overflow-y: visible !important;
+        }
+        
+        /* 印刷プレビュー領域の固定比率 (A4 Landscape) */
+        .a4-landscape {
+            aspect-ratio: 297 / 210;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- コントロールパネル（印刷時は非表示） -->
+    <div class="no-print bg-white shadow-md p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <h1 class="text-2xl font-bold text-indigo-600"><i class="fa-solid fa-calendar-days mr-2"></i>時間割メーカー</h1>
+            
+            <div class="flex flex-wrap gap-4 items-center justify-center">
+                <!-- テーマ選択 -->
+                <div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg overflow-x-auto max-w-[90vw] md:max-w-none">
+                    <span class="text-xs font-bold text-gray-400 px-2 whitespace-nowrap">テーマ:</span>
+                    <button onclick="setTheme('pop')" id="btn-pop" class="whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium transition-colors bg-white shadow-sm text-pink-500">
+                        <i class="fa-solid fa-star mr-1"></i>ポップ
+                    </button>
+                    <button onclick="setTheme('natural')" id="btn-natural" class="whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa-solid fa-leaf mr-1"></i>自然
+                    </button>
+                    <button onclick="setTheme('cool')" id="btn-cool" class="whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa-solid fa-bolt mr-1"></i>クール
+                    </button>
+                    <button onclick="setTheme('simple')" id="btn-simple" class="whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa-solid fa-briefcase mr-1"></i>基本
+                    </button>
+                </div>
+
+                <!-- モード選択 -->
+                <div class="flex items-center space-x-2 bg-gray-100 p-1 rounded-lg">
+                    <button onclick="setMode('child')" id="btn-child" class="px-3 py-1 rounded-md text-sm font-medium transition-colors bg-white shadow-sm text-indigo-500">
+                        <i class="fa-solid fa-child mr-1"></i>児童
+                    </button>
+                    <button onclick="setMode('parent')" id="btn-parent" class="px-3 py-1 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                        <i class="fa-solid fa-user-group mr-1"></i>詳細
+                    </button>
+                </div>
+
+                <!-- アクション -->
+                <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex items-center transition">
+                    <i class="fa-solid fa-print mr-2"></i>印刷 / PDF出力
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- 左側：設定・科目リスト -->
+            <div class="no-print w-full lg:w-1/4 space-y-6">
+                <!-- クラス名・タイトル設定 -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-700 mb-2">タイトル設定</h3>
+                    <input type="text" id="input-title" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400" value="2年 1組 時間割" oninput="updateTitle()">
+                    
+                    <div class="mt-3">
+                        <label class="block text-xs font-bold text-gray-500 mb-1">期間 (手動入力またはカレンダー選択)</label>
+                        <input type="text" id="input-subtitle" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" value="期間: 9月1日 〜 9月7日" oninput="updateTitle()">
+                        
+                        <div class="mt-2 flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200">
+                            <i class="fa-regular fa-calendar text-gray-400"></i>
+                            <input type="date" id="input-date-picker" class="bg-transparent text-sm w-full focus:outline-none text-gray-600" onchange="updateDateFromPicker(this.value)">
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-1 text-right">※開始日を選ぶと自動入力されます</p>
+                    </div>
+                </div>
+
+                <!-- 科目管理 -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <h3 class="font-bold text-gray-700 mb-4 flex justify-between items-center">
+                        科目リスト
+                        <button onclick="addSubjectPrompt()" class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"><i class="fa-solid fa-plus"></i> 追加</button>
+                    </h3>
+                    <div id="subjects-list" class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                        <!-- JSで生成 -->
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800">
+                    <p><i class="fa-solid fa-circle-info mr-1"></i>使い方</p>
+                    <ul class="list-disc list-inside mt-1 ml-1 space-y-1">
+                        <li>セルをクリックして編集</li>
+                        <li>上のボタンでデザイン切替</li>
+                        <li>印刷設定は「横向き」推奨</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 右側：時間割プレビューエリア -->
+            <div class="w-full lg:w-3/4 flex justify-center bg-gray-200 p-4 rounded-xl overflow-auto">
+                <div id="timetable-area" class="print-area theme-pop mode-child bg-white p-8 shadow-xl a4-landscape relative">
+                    <!-- ヘッダー -->
+                    <div class="text-center mb-6">
+                        <h1 id="display-title" class="text-3xl font-bold mb-2 text-gray-800">2年 1組 時間割</h1>
+                        <p id="display-subtitle" class="text-lg text-gray-600">期間: 9月1日 〜 9月7日</p>
+                    </div>
+
+                    <!-- 時間割グリッド -->
+                    <div class="timetable-grid h-[80%]">
+                        <!-- ヘッダー行 -->
+                        <div class="t-header flex items-center justify-center font-bold">時限</div>
+                        <div class="t-header flex items-center justify-center font-bold">月</div>
+                        <div class="t-header flex items-center justify-center font-bold">火</div>
+                        <div class="t-header flex items-center justify-center font-bold">水</div>
+                        <div class="t-header flex items-center justify-center font-bold">木</div>
+                        <div class="t-header flex items-center justify-center font-bold">金</div>
+
+                        <!-- 1限 -->
+                        <div class="t-header flex flex-col items-center justify-center font-bold text-sm bg-gray-100">
+                            <span>1</span>
+                            <span class="text-xs font-normal mt-1 detail-info">8:50<br>~9:35</span>
+                        </div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(0, 0)" id="cell-0-0"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(1, 0)" id="cell-1-0"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(2, 0)" id="cell-2-0"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(3, 0)" id="cell-3-0"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(4, 0)" id="cell-4-0"></div>
+
+                        <!-- 2限 -->
+                        <div class="t-header flex flex-col items-center justify-center font-bold text-sm bg-gray-100">
+                            <span>2</span>
+                            <span class="text-xs font-normal mt-1 detail-info">9:45<br>~10:30</span>
+                        </div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(0, 1)" id="cell-0-1"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(1, 1)" id="cell-1-1"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(2, 1)" id="cell-2-1"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(3, 1)" id="cell-3-1"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(4, 1)" id="cell-4-1"></div>
+
+                        <!-- 3限 -->
+                        <div class="t-header flex flex-col items-center justify-center font-bold text-sm bg-gray-100">
+                            <span>3</span>
+                            <span class="text-xs font-normal mt-1 detail-info">10:45<br>~11:30</span>
+                        </div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(0, 2)" id="cell-0-2"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(1, 2)" id="cell-1-2"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(2, 2)" id="cell-2-2"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(3, 2)" id="cell-3-2"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(4, 2)" id="cell-4-2"></div>
+
+                        <!-- 4限 -->
+                        <div class="t-header flex flex-col items-center justify-center font-bold text-sm bg-gray-100">
+                            <span>4</span>
+                            <span class="text-xs font-normal mt-1 detail-info">11:40<br>~12:25</span>
+                        </div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(0, 3)" id="cell-0-3"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(1, 3)" id="cell-1-3"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(2, 3)" id="cell-2-3"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(3, 3)" id="cell-3-3"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(4, 3)" id="cell-4-3"></div>
+
+                        <!-- 昼休み (Optional, skipped for simplicity or merged) -->
+                        <div class="col-span-6 h-2 bg-gray-200/50 rounded-full my-1 flex items-center justify-center text-[10px] text-gray-400 tracking-widest">LUNCH TIME</div>
+
+                        <!-- 5限 -->
+                        <div class="t-header flex flex-col items-center justify-center font-bold text-sm bg-gray-100">
+                            <span>5</span>
+                            <span class="text-xs font-normal mt-1 detail-info">13:15<br>~14:00</span>
+                        </div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(0, 4)" id="cell-0-4"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(1, 4)" id="cell-1-4"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(2, 4)" id="cell-2-4"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(3, 4)" id="cell-3-4"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(4, 4)" id="cell-4-4"></div>
+
+                        <!-- 6限 -->
+                        <div class="t-header flex flex-col items-center justify-center font-bold text-sm bg-gray-100">
+                            <span>6</span>
+                            <span class="text-xs font-normal mt-1 detail-info">14:10<br>~14:55</span>
+                        </div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(0, 5)" id="cell-0-5"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(1, 5)" id="cell-1-5"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(2, 5)" id="cell-2-5"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(3, 5)" id="cell-3-5"></div>
+                        <div class="t-cell cursor-pointer hover:opacity-80 transition" onclick="editCell(4, 5)" id="cell-4-5"></div>
+                    </div>
+                    
+                    <!-- フッターメッセージ -->
+                    <div class="absolute bottom-4 right-8 text-sm text-gray-500 detail-info">
+                        ※予定は変更になる場合があります。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編集モーダル -->
+    <div id="edit-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50" onclick="closeModal()"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto transform scale-95 transition-transform duration-300" id="modal-content">
+            
+            <div class="modal-content py-4 text-left px-6">
+                <!--Title-->
+                <div class="flex justify-between items-center pb-3 border-b">
+                    <p class="text-2xl font-bold text-gray-700" id="modal-title">編集</p>
+                    <div class="modal-close cursor-pointer z-50" onclick="closeModal()">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!--Body-->
+                <div class="my-5 space-y-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">科目</label>
+                        <div class="grid grid-cols-3 gap-2" id="modal-subject-selector">
+                            <!-- JSでボタン生成 -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">先生の名前 (任意)</label>
+                        <input type="text" id="modal-teacher" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="例: 佐藤先生">
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">教室 / 場所 (任意)</label>
+                        <input type="text" id="modal-room" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="例: 音楽室">
+                    </div>
+                </div>
+
+                <!--Footer-->
+                <div class="flex justify-end pt-2 gap-2">
+                    <button onclick="clearCell()" class="px-4 py-2 bg-red-100 p-3 rounded-lg text-red-500 hover:bg-red-200 hover:text-red-700 mr-auto">消去</button>
+                    <button onclick="closeModal()" class="px-4 py-2 bg-transparent p-3 rounded-lg text-indigo-500 hover:bg-gray-100 hover:text-indigo-400 mr-2">キャンセル</button>
+                    <button onclick="saveCell()" class="px-4 py-2 bg-indigo-500 p-3 rounded-lg text-white hover:bg-indigo-400">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- データ定義 ---
+        
+        // デフォルト科目データ
+        const defaultSubjects = [
+            { id: 'jpn', name: '国語', color: '#fbcfe8', textColor: '#be185d' }, // pink-200
+            { id: 'math', name: '算数', color: '#bfdbfe', textColor: '#1e40af' }, // blue-200
+            { id: 'sci', name: '理科', color: '#bbf7d0', textColor: '#15803d' }, // green-200
+            { id: 'soc', name: '社会', color: '#fde68a', textColor: '#b45309' }, // amber-200
+            { id: 'eng', name: '英語', color: '#ddd6fe', textColor: '#6d28d9' }, // violet-200
+            { id: 'mus', name: '音楽', color: '#fed7aa', textColor: '#c2410c' }, // orange-200
+            { id: 'art', name: '図工', color: '#bae6fd', textColor: '#0369a1' }, // sky-200
+            { id: 'pe', name: '体育', color: '#fecaca', textColor: '#b91c1c' }, // red-200
+            { id: 'hr', name: '学活', color: '#e5e7eb', textColor: '#374151' }, // gray-200
+            { id: 'mor', name: '道徳', color: '#a7f3d0', textColor: '#047857' }, // emerald-200
+        ];
+
+        let subjects = JSON.parse(localStorage.getItem('myTimetable_subjects')) || defaultSubjects;
+        
+        // 時間割データ (5日 x 6限)
+        // データ構造: key="col-row" value={ subjectId, teacher, room }
+        let scheduleData = JSON.parse(localStorage.getItem('myTimetable_data')) || {
+            "0-0": { subjectId: "jpn", teacher: "田中", room: "" },
+            "1-0": { subjectId: "math", teacher: "鈴木", room: "" },
+            "2-0": { subjectId: "sci", teacher: "高橋", room: "理科室" },
+        };
+
+        let currentEditingCell = null;
+
+        // --- 初期化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderSubjectList();
+            renderTimetable();
+            
+            // 以前の設定をロード（あれば）
+            const savedTitle = localStorage.getItem('myTimetable_title');
+            if(savedTitle) {
+                document.getElementById('input-title').value = savedTitle;
+                updateTitle();
+            }
+            const savedSubtitle = localStorage.getItem('myTimetable_subtitle');
+            if(savedSubtitle) {
+                document.getElementById('input-subtitle').value = savedSubtitle;
+                updateTitle();
+            }
+        });
+
+        // --- 描画関数 ---
+
+        function updateTitle() {
+            const title = document.getElementById('input-title').value;
+            const subtitle = document.getElementById('input-subtitle').value;
+            document.getElementById('display-title').innerText = title;
+            document.getElementById('display-subtitle').innerText = subtitle;
+            
+            localStorage.setItem('myTimetable_title', title);
+            localStorage.setItem('myTimetable_subtitle', subtitle);
+        }
+
+        function updateDateFromPicker(dateStr) {
+            if (!dateStr) return;
+            
+            // YYYY-MM-DD形式をパース
+            const parts = dateStr.split('-');
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            
+            const start = new Date(year, month, day);
+            const endDate = new Date(year, month, day + 6); // 1週間分
+
+            // フォーマット: M月D日
+            const format = (d) => `${d.getMonth() + 1}月${d.getDate()}日`;
+            
+            const periodText = `期間: ${format(start)} 〜 ${format(endDate)}`;
+            
+            // inputにセットして更新
+            const subtitleInput = document.getElementById('input-subtitle');
+            subtitleInput.value = periodText;
+            updateTitle();
+        }
+
+        // 科目リスト（サイドバー）描画
+        function renderSubjectList() {
+            const container = document.getElementById('subjects-list');
+            container.innerHTML = '';
+
+            subjects.forEach((sub, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-white p-2 rounded border border-gray-100 hover:shadow-sm transition';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <input type="color" value="${sub.color}" onchange="updateSubjectColor('${sub.id}', this.value)" class="w-6 h-6 rounded cursor-pointer border-none p-0 overflow-hidden">
+                        <span class="font-bold text-gray-700">${sub.name}</span>
+                    </div>
+                    <button onclick="deleteSubject(${index})" class="text-gray-400 hover:text-red-500 px-2"><i class="fa-solid fa-trash-can"></i></button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // 時間割表の描画
+        function renderTimetable() {
+            for (let day = 0; day < 5; day++) {
+                for (let period = 0; period < 6; period++) {
+                    const key = `${day}-${period}`;
+                    const cell = document.getElementById(`cell-${key}`);
+                    const data = scheduleData[key];
+
+                    cell.innerHTML = '';
+                    cell.style.backgroundColor = '';
+                    cell.style.color = '';
+                    cell.style.border = '';
+
+                    if (data && data.subjectId) {
+                        const subject = subjects.find(s => s.id === data.subjectId);
+                        if (subject) {
+                            cell.style.backgroundColor = subject.color;
+                            cell.style.color = subject.textColor;
+                            
+                            // コンテンツ構築
+                            let html = `<div class="flex flex-col items-center justify-center h-full w-full p-1 text-center overflow-hidden">`;
+                            html += `<div class="subject-name leading-tight mb-1 break-words w-full">${subject.name}</div>`;
+                            
+                            // 詳細情報（保護者用モードで表示）
+                            html += `<div class="detail-info w-full">`;
+                            if(data.room) html += `<div class="bg-white/50 rounded px-1 text-[10px] mb-0.5 inline-block mx-auto"><i class="fa-solid fa-location-dot"></i> ${data.room}</div><br>`;
+                            if(data.teacher) html += `<span class="text-[10px] font-bold">${data.teacher}</span>`;
+                            html += `</div>`;
+                            
+                            html += `</div>`;
+                            cell.innerHTML = html;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 操作ロジック ---
+
+        // テーマ切り替え
+        function setTheme(theme) {
+            const area = document.getElementById('timetable-area');
+            const themeClasses = ['theme-pop', 'theme-natural', 'theme-cool', 'theme-simple'];
+            const btnIds = {
+                'pop': 'btn-pop',
+                'natural': 'btn-natural',
+                'cool': 'btn-cool',
+                'simple': 'btn-simple'
+            };
+            const btnStyles = {
+                'pop': 'text-pink-500',
+                'natural': 'text-amber-700',
+                'cool': 'text-blue-600',
+                'simple': 'text-gray-700'
+            };
+
+            // 1. エリアのクラスをリセットして新テーマ適用
+            themeClasses.forEach(c => area.classList.remove(c));
+            area.classList.add(`theme-${theme}`);
+
+            // 2. ボタンの見た目更新
+            Object.keys(btnIds).forEach(key => {
+                const btn = document.getElementById(btnIds[key]);
+                if (key === theme) {
+                    btn.classList.remove('text-gray-500');
+                    btn.classList.add('bg-white', 'shadow-sm', btnStyles[key]);
+                } else {
+                    btn.classList.add('text-gray-500');
+                    btn.classList.remove('bg-white', 'shadow-sm', 'text-pink-500', 'text-amber-700', 'text-blue-600', 'text-gray-700');
+                }
+            });
+        }
+
+        // モード切り替え（児童用・保護者用）
+        function setMode(mode) {
+            const area = document.getElementById('timetable-area');
+            const btnChild = document.getElementById('btn-child');
+            const btnParent = document.getElementById('btn-parent');
+
+            if (mode === 'child') {
+                area.classList.remove('mode-parent');
+                area.classList.add('mode-child');
+
+                btnChild.classList.remove('text-gray-500');
+                btnChild.classList.add('bg-white', 'shadow-sm', 'text-indigo-500');
+                btnParent.classList.add('text-gray-500');
+                btnParent.classList.remove('bg-white', 'shadow-sm', 'text-gray-700');
+            } else {
+                area.classList.remove('mode-child');
+                area.classList.add('mode-parent');
+
+                btnParent.classList.remove('text-gray-500');
+                btnParent.classList.add('bg-white', 'shadow-sm', 'text-gray-700');
+                btnChild.classList.add('text-gray-500');
+                btnChild.classList.remove('bg-white', 'shadow-sm', 'text-indigo-500');
+            }
+        }
+
+        // --- 科目管理 ---
+
+        function addSubjectPrompt() {
+            const name = prompt("新しい科目の名前を入力してください");
+            if (name) {
+                const id = 'sub_' + Date.now();
+                // ランダムなパステルカラー
+                const hue = Math.floor(Math.random() * 360);
+                const color = `hsl(${hue}, 100%, 90%)`;
+                const textColor = `hsl(${hue}, 80%, 30%)`;
+                
+                subjects.push({ id, name, color, textColor });
+                saveSubjects();
+                renderSubjectList();
+            }
+        }
+
+        function deleteSubject(index) {
+            if(confirm("この科目をリストから削除しますか？")) {
+                subjects.splice(index, 1);
+                saveSubjects();
+                renderSubjectList();
+            }
+        }
+
+        function updateSubjectColor(id, hexColor) {
+            const sub = subjects.find(s => s.id === id);
+            if(sub) {
+                sub.color = hexColor;
+                saveSubjects();
+                renderTimetable();
+            }
+        }
+
+        function saveSubjects() {
+            localStorage.setItem('myTimetable_subjects', JSON.stringify(subjects));
+        }
+
+        // --- モーダル・編集 ---
+
+        function editCell(day, period) {
+            currentEditingCell = `${day}-${period}`;
+            const data = scheduleData[currentEditingCell] || {};
+            
+            // モーダルのリセット
+            const container = document.getElementById('modal-subject-selector');
+            container.innerHTML = '';
+
+            // 科目ボタン生成
+            subjects.forEach(sub => {
+                const btn = document.createElement('button');
+                btn.className = `p-2 rounded border text-sm font-bold transition hover:opacity-80 ${data.subjectId === sub.id ? 'ring-2 ring-indigo-500' : ''}`;
+                btn.style.backgroundColor = sub.color;
+                btn.style.color = sub.textColor;
+                btn.innerText = sub.name;
+                btn.onclick = () => selectSubjectInModal(sub.id, btn);
+                container.appendChild(btn);
+            });
+
+            document.getElementById('modal-teacher').value = data.teacher || '';
+            document.getElementById('modal-room').value = data.room || '';
+            document.getElementById('modal-title').innerText = `${['月','火','水','木','金'][day]}曜日 ${period + 1}限の編集`;
+
+            toggleModal(true);
+        }
+
+        // モーダル内で科目を選択した時のUI挙動
+        let tempSelectedSubjectId = null;
+        function selectSubjectInModal(id, btnElement) {
+            tempSelectedSubjectId = id;
+            // スタイルリセット
+            const buttons = document.getElementById('modal-subject-selector').children;
+            for(let btn of buttons) {
+                btn.classList.remove('ring-2', 'ring-indigo-500');
+            }
+            btnElement.classList.add('ring-2', 'ring-indigo-500');
+        }
+
+        function saveCell() {
+            if (!currentEditingCell) return;
+
+            // 既存データ取得 または 新規
+            const teacher = document.getElementById('modal-teacher').value;
+            const room = document.getElementById('modal-room').value;
+
+            // 科目が選択されていない場合、既存のsubjectIdを維持するか確認
+            const currentData = scheduleData[currentEditingCell] || {};
+            const subjectId = tempSelectedSubjectId || currentData.subjectId;
+
+            if (subjectId) {
+                scheduleData[currentEditingCell] = {
+                    subjectId,
+                    teacher,
+                    room
+                };
+            }
+
+            localStorage.setItem('myTimetable_data', JSON.stringify(scheduleData));
+            renderTimetable();
+            toggleModal(false);
+            tempSelectedSubjectId = null;
+        }
+
+        function clearCell() {
+            if (currentEditingCell) {
+                delete scheduleData[currentEditingCell];
+                localStorage.setItem('myTimetable_data', JSON.stringify(scheduleData));
+                renderTimetable();
+            }
+            toggleModal(false);
+        }
+
+        function toggleModal(show) {
+            const modal = document.getElementById('edit-modal');
+            const modalContent = document.getElementById('modal-content');
+            
+            if (show) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                document.body.classList.add('modal-active');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            } else {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                document.body.classList.remove('modal-active');
+                modalContent.classList.remove('scale-100');
+                modalContent.classList.add('scale-95');
+                tempSelectedSubjectId = null;
+            }
+        }
+
+        function closeModal() {
+            toggleModal(false);
+        }
+
+        // キー操作でモーダルを閉じる
+        document.onkeydown = function(evt) {
+            evt = evt || window.event;
+            if (evt.key === "Escape") {
+                closeModal();
+            }
+        };
+
+    </script>
+</body>
+</html>
